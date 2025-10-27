@@ -1,0 +1,117 @@
+/* Tailwind base layers */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Leaflet map styles */
+@import "leaflet/dist/leaflet.css";
+
+/* ===== Root Theme Variables ===== */
+:root {
+  --bg: 248 250 252;
+  --fg: 15 23 42;
+  --primary: 79 70 229; /* Indigo-600 */
+  --secondary: 14 165 233; /* Sky-500 */
+}
+
+/* ===== Global Layout ===== */
+html,
+body {
+  height: 100%;
+  background: rgb(var(--bg));
+  color: rgb(var(--fg));
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  scroll-behavior: smooth;
+}
+
+/* ===== Reusable Layout Utilities ===== */
+.container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* ===== Cards & Surfaces ===== */
+.card {
+  @apply bg-white rounded-3xl shadow-xl ring-1 ring-slate-200 p-6 sm:p-8 relative;
+}
+
+.card::before {
+  /* soft gradient glow behind card */
+  content: "";
+  @apply absolute inset-0 -z-10 rounded-3xl bg-gradient-to-r from-indigo-500/5 via-sky-500/5 to-emerald-500/5 blur-2xl;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-2.5 font-semibold shadow
+    text-white bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600
+    hover:from-indigo-500 hover:to-cyan-500 transition disabled:opacity-50;
+}
+
+.btn-outline {
+  @apply inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-2.5 font-medium
+    border border-slate-300 text-slate-700 bg-white hover:bg-slate-50 transition;
+}
+
+.btn-sm {
+  @apply px-3 py-1.5 text-sm rounded-xl;
+}
+
+/* ===== Inputs & Textareas ===== */
+.input {
+  @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2
+    focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500;
+}
+
+.textarea {
+  @apply w-full rounded-xl border border-slate-300 bg-white p-3 min-h-[140px]
+    focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500;
+}
+
+/* ===== Badges & Tags ===== */
+.badge {
+  @apply inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600;
+}
+
+.badge-primary {
+  @apply bg-indigo-100 text-indigo-700;
+}
+
+/* ===== Shadows ===== */
+.shadow-soft {
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.06), 0 6px 20px rgba(15, 23, 42, 0.04);
+}
+
+/* ===== Headings & Typography ===== */
+h1, h2, h3, h4, h5, h6 {
+  @apply text-slate-900 font-semibold tracking-tight;
+}
+
+p {
+  @apply text-slate-700 leading-relaxed;
+}
+
+/* ===== Scrollbar ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.4);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+/* ===== Leaflet Container Tweaks ===== */
+.leaflet-container {
+  font-family: inherit;
+  border-radius: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+/* ===== Footer Fade ===== */
+footer {
+  background: linear-gradient(to bottom, #f9fafb, #ffffff);
+}
