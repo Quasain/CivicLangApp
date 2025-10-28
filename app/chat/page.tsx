@@ -2,75 +2,154 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+type Role = 'user' | 'assistant';
+type ChatMessage = { role: Role; content: string; ts?: number };
+
+const LS_KEY = 'civic-chat:conversation-v2';
+
+const QUICK_PROMPTS = [
+  'Where can I vote in Orange County?',
+  'How do I report missed trash pickup?',
+  'What documents do I need for IUSD enrollment?',
+  'How do I get a library card in Irvine?',
+];
+
 export default function ChatPage() {
-  const [lang, setLang] = useState<'en' | 'ko' | 'zh' | 'fa' | 'es'>('en');
-  const [q, setQ] = useState('How do I report missed trash pickup?');
-  const [out, setOut] = useState('');
+  const [lang, setLang] = useState<'auto' | 'en' | 'ko' | 'zh' | 'fa' | 'es'>('en');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Extract URLs from the model output for basic "Sources" rendering.
-  const sources = useMemo(() => {
-    const urls = Array.from(new Set((out.match(/https?:\/\/[^\s)]+/g) || [])));
-    return urls.slice(0, 8);
-  }, [out]);
+  // Load & persist conversation + language
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { messages?: ChatMessage[]; lang?: string };
+        if (parsed.messages) setMessages(parsed.messages);
+        if (parsed.lang && ['auto','en','ko','zh','fa','es'].includes(parsed.lang))
+          setLang(parsed.lang as any);
+      }
+    } catch {}
+  }, []);
 
-  // Keyboard shortcut: Ctrl/Cmd + Enter to ask
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify({ messages, lang }));
+    } catch {}
+  }, [messages, lang]);
+
+  // Auto-scroll to bottom on updates
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages, loading]);
+
+  // Cmd/Ctrl + Enter to send
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'enter') {
-        void run();
+        e.preventDefault();
+        void send();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [q, lang]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [input, messages, lang]);
 
-  const run = async () => {
+  const latestAssistant = useMemo(
+    () => [...messages].reverse().find((m) => m.role === 'assistant')?.content ?? '',
+    [messages]
+  );
+
+  async function send() {
+    const text = input.trim();
+    if (!text || loading) return;
+
+    setError(null);
+    const next = [...messages, { role: 'user', content: text, ts: Date.now() }];
+    setMessages(next);
+    setInput('');
+    setLoading(true);
+
     try {
-      setLoading(true);
-      setError(null);
-      setOut('Thinking…');
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: q, lang }),
+        body: JSON.stringify({
+          messages: next.map(({ role, content }) => ({ role, content })),
+          language: lang,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Request failed');
-      setOut(data.output || '');
-    } catch (err: any) {
-      setError(err?.message || 'Something went wrong.');
-      setOut('');
+
+      const reply = (data?.reply || data?.output || '').toString();
+      setMessages((prev) => [...prev, { role: 'assistant', content: reply, ts: Date.now() }]);
+    } catch (e: any) {
+      setError(e?.message || 'Something went wrong.');
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content:
+            'Sorry — I couldn’t complete that request. Please check your connection and try again.',
+          ts: Date.now(),
+        },
+      ]);
     } finally {
       setLoading(false);
+      inputRef.current?.focus();
     }
-  };
+  }
 
-  const clear = () => {
-    setQ('');
-    setOut('');
+  function newChat() {
+    setMessages([]);
     setError(null);
-    textareaRef.current?.focus();
-  };
+    setInput('');
+    try { localStorage.removeItem(LS_KEY); } catch {}
+    inputRef.current?.focus();
+  }
 
-  const copyOut = async () => {
-    if (!out) return;
-    await navigator.clipboard.writeText(out);
-  };
+  function insertPrompt(p: string) {
+    setInput(p);
+    inputRef.current?.focus();
+  }
+
+  async function copyLast() {
+    if (!latestAssistant) return;
+    await navigator.clipboard.writeText(latestAssistant);
+  }
+
+  function exportHistory() {
+    const blob = new Blob([JSON.stringify({ messages, lang }, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `civic-chat-${new Date().toISOString().slice(0, 19)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const canSend = input.trim().length > 0 && !loading;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-white">
-      {/* Top bar / hero */}
+      {/* HEADER */}
       <header className="border-b border-slate-200 bg-white/70 backdrop-blur">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-           
             <div>
-              <h1 className="text-lg font-semibold text-slate-900 tracking-tight">CivicLang</h1>
-              <p className="text-xs text-slate-500">Multilingual civic assistant for Irvine residents</p>
+              <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Civic Chat</h1>
+              <p className="text-xs text-slate-500">
+                An intelligent civic chatbot that helps residents simplify city documents, navigate local services, and communicate confidently with Irvine agencies — all in their preferred language.
+              </p>
             </div>
           </div>
           <div className="hidden sm:flex items-center gap-3 text-xs text-slate-500">
@@ -78,167 +157,198 @@ export default function ChatPage() {
           </div>
         </div>
       </header>
-	
-      {/* Main */}
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left: Input card */}
-          <section className="relative rounded-3xl bg-white/80 backdrop-blur-md shadow-xl ring-1 ring-slate-200">
-            <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-r from-indigo-500/10 via-sky-500/10 to-emerald-500/10 blur-2xl" />
-            <div className="p-6 sm:p-8">
-              <h2 className="text-xl font-semibold text-slate-900 tracking-tight">Ask Civic Chat</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Ask about city services, schools (IUSD), voting (OCVote), or local info. Answers will include helpful links when possible.
+
+      {/* MAIN */}
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-8">
+        <section className="relative mt-0 rounded-3xl ring-1 ring-slate-200 shadow-xl bg-white overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-indigo-50 via-sky-50 to-emerald-50" />
+          <div className="relative flex flex-col min-h-[84vh] max-h-[94vh]">
+            {/* Toolbar */}
+            <div className="px-6 sm:px-8 pt-4 pb-2 flex flex-col md:flex-row md:items-center gap-3 justify-between">
+              <p className="text-sm text-slate-500">
+                Ask in any language; replies come as clear, numbered steps.
               </p>
-
-              {/* Question textarea */}
-              <div className="mt-5">
-                <label htmlFor="question" className="block text-sm font-medium text-slate-700 mb-1">
-                  Your question
-                </label>
-                <textarea
-                  id="question"
-                  ref={textareaRef}
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="e.g., Where can I drop off my ballot? How do I enroll my child in IUSD?"
-                  rows={5}
-                  className="w-full resize-y rounded-2xl border border-slate-300 bg-white px-4 py-3 text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {[
-                    'Where can I vote in Orange County?',
-                    'How do I report missed trash pickup?',
-                    'What documents do I need for IUSD enrollment?',
-                  ].map((s, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600 hover:bg-slate-100"
-                      onClick={() => setQ(s)}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Controls */}
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                <div className="sm:col-span-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Language</label>
+              <div className="flex flex-wrap gap-2">
+                <label className="text-sm text-slate-700 flex items-center gap-2">
+                  Reply language:
                   <select
                     value={lang}
                     onChange={(e) => setLang(e.target.value as any)}
-                    className="w-full rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500"
-                    aria-label="Select response language"
+                    className="rounded-md border border-slate-300 px-2 py-1 text-sm bg-white"
                   >
+                    <option value="auto">Auto-detect</option>
                     <option value="en">English</option>
-                    <option value="ko">Korean</option>
-                    <option value="zh">Chinese</option>
-                    <option value="fa">Persian</option>
                     <option value="es">Spanish</option>
+                    <option value="zh">Chinese</option>
+                    <option value="ko">Korean</option>
+                    <option value="fa">Persian</option>
                   </select>
-                </div>
-
-                <div className="flex gap-3 sm:col-span-2">
-                  <button
-                    type="button"
-                    onClick={run}
-                    disabled={loading || !q.trim()}
-                    className="inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold text-white shadow-lg transition disabled:opacity-50
-                               bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 hover:from-indigo-500 hover:via-blue-500 hover:to-cyan-500"
-                    aria-label="Ask"
-                  >
-                    {loading ? (
-                      <span className="inline-flex items-center gap-2">
-                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                        </svg>
-                        Thinking…
-                      </span>
-                    ) : (
-                      'Ask'
-                    )}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={clear}
-                    disabled={loading}
-                    className="inline-flex items-center justify-center rounded-2xl px-5 py-3 font-semibold border border-slate-300 text-slate-700 hover:bg-slate-50"
-                    aria-label="Clear"
-                  >
-                    Clear
-                  </button>
-                </div>
+                </label>
+                <button
+                  onClick={exportHistory}
+                  disabled={messages.length === 0}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Export
+                </button>
+                <button
+                  onClick={copyLast}
+                  disabled={messages.length === 0}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Copy last
+                </button>
+                <button
+                  onClick={newChat}
+                  className="rounded-md border border-rose-300 px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50"
+                >
+                  New chat
+                </button>
               </div>
             </div>
-          </section>
 
-          {/* Right: Output card */}
-          <section className="rounded-3xl bg-white shadow-xl ring-1 ring-slate-200">
-            <div className="p-6 sm:p-8">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-slate-900 tracking-tight">Answer</h2>
-                <div className="flex items-center gap-2">
-                  <button
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 disabled:opacity-50"
-                    onClick={copyOut}
-                    disabled={!out || loading}
-                  >
-                    Copy
-                  </button>
-                </div>
-              </div>
-
-              {/* Error / Output / Skeleton */}
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
-                {error ? (
-                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-rose-700 text-sm">
-                    {error}
-                  </div>
-                ) : loading ? (
-                  <div className="animate-pulse space-y-2">
-                    <div className="h-3 rounded bg-slate-200 w-11/12" />
-                    <div className="h-3 rounded bg-slate-200 w-10/12" />
-                    <div className="h-3 rounded bg-slate-200 w-9/12" />
-                    <div className="h-3 rounded bg-slate-200 w-8/12" />
-                  </div>
-                ) : out ? (
-                  <pre className="whitespace-pre-wrap text-slate-900 text-sm leading-relaxed">{out}</pre>
-                ) : (
-                  <p className="text-sm text-slate-500">Ask a question to see the answer here.</p>
-                )}
-              </div>
-
-              {/* Sources */}
-              {sources.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-sm font-semibold text-slate-700">Sources</h3>
-                  <ul className="mt-2 space-y-1">
-                    {sources.map((u) => (
-                      <li key={u} className="truncate">
-                        <a
-                          href={u}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-sm text-indigo-600 hover:text-indigo-700 underline decoration-dotted underline-offset-4"
-                          title={u}
+            {/* Conversation */}
+            <div ref={listRef} className="px-6 sm:px-8 pt-2 pb-4 flex-1 overflow-y-auto">
+              {messages.length === 0 ? (
+                <EmptyState />
+              ) : (
+                <ul className="space-y-4">
+                  {messages.map((m, i) => {
+                    const urls = m.role === 'assistant' ? extractUrls(m.content) : [];
+                    return (
+                      <li key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div
+                          className={
+                            m.role === 'user'
+                              ? 'max-w-[80%] rounded-2xl bg-blue-600 text-white px-4 py-3 shadow-sm'
+                              : 'max-w-[80%] rounded-2xl bg-white border px-4 py-3 shadow-sm'
+                          }
                         >
-                          {u}
-                        </a>
+                          <MessageText content={m.content} />
+                          {m.role === 'assistant' && urls.length > 0 && (
+                            <div className="mt-3">
+                              <div className="text-xs font-semibold text-slate-700">Sources</div>
+                              <ul className="mt-1 space-y-1">
+                                {urls.map((u) => (
+                                  <li key={u} className="truncate">
+                                    <a
+                                      href={u}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-xs text-indigo-600 hover:text-indigo-700 underline decoration-dotted underline-offset-4"
+                                      title={u}
+                                    >
+                                      {u}
+                                    </a>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
                       </li>
-                    ))}
-                  </ul>
-                </div>
+                    );
+                  })}
+                  {loading && <LoadingBubble />}
+                  {error && (
+                    <li className="flex justify-start">
+                      <div className="max-w-[80%] rounded-2xl bg-rose-50 border border-rose-200 px-4 py-3 text-rose-700 text-sm">
+                        {error}
+                      </div>
+                    </li>
+                  )}
+                </ul>
               )}
             </div>
-          </section>
-        </div>
+
+            {/* Composer */}
+            <div className="px-6 sm:px-8 pb-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                {messages.length === 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {QUICK_PROMPTS.map((p, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => insertPrompt(p)}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <form
+                  className="flex gap-2 items-end"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (canSend) void send();
+                  }}
+                >
+                  <textarea
+                    ref={inputRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Ask about city services, schools, voting, permits, etc. (Ctrl/⌘ + Enter to send)"
+                    rows={2}
+                    className="flex-1 max-h-36 min-h-[44px] rounded-xl border border-slate-300 bg-white px-4 py-2 text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!canSend}
+                    className="rounded-xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white px-5 py-3 font-semibold shadow-lg disabled:opacity-50"
+                  >
+                    {loading ? 'Thinking…' : 'Send'}
+                  </button>
+                </form>
+                <p className="mt-2 text-xs text-slate-500">Your conversation is stored locally in your browser.</p>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   );
 }
 
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center justify-center text-center mt-2">
+      <div className="text-lg font-semibold text-slate-800">How can I help?</div>
+      <p className="text-slate-500 mt-1">
+        Ask in English, Español, 中文, 한국어, فارسی… You’ll get step-by-step instructions.
+      </p>
+    </div>
+  );
+}
+
+function LoadingBubble() {
+  return (
+    <li className="flex justify-start">
+      <div className="max-w-[80%] rounded-2xl bg-white border px-4 py-3">
+        <div className="animate-pulse space-y-2">
+          <div className="h-3 w-48 bg-slate-200 rounded" />
+          <div className="h-3 w-72 bg-slate-200 rounded" />
+          <div className="h-3 w-56 bg-slate-200 rounded" />
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function MessageText({ content }: { content: string }) {
+  // escape + light formatting
+  const html = content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/\n/g, '<br/>')
+    .replace(/\* /g, '• ')
+    .replace(/(\d+)\. /g, '<strong>$1.</strong> ');
+  // eslint-disable-next-line react/no-danger
+  return <div className="whitespace-pre-wrap leading-relaxed" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+function extractUrls(s: string): string[] {
+  const urls = Array.from(new Set((s.match(/https?:\/\/[^\s)]+/g) || [])));
+  return urls.slice(0, 8);
+}

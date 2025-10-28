@@ -5,7 +5,7 @@ import HeaderNav from "@/components/HeaderNav";
 
 export const metadata: Metadata = {
   title: "CivicLang",
-  description: "Language for Civic Life — AI-powered local language access for Irvine",
+  description: "Intelligent access to your city, in any language",
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
@@ -34,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <span className="flex flex-col leading-tight">
                   <span className="text-lg font-semibold tracking-tight">CivicLang</span>
                   <span className="text-[11px] text-slate-500 hidden sm:block">
-                    Language for Civic Life
+                    Intelligent access to your city, in any language
                   </span>
                 </span>
               </Link>
@@ -58,17 +58,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 CivicLang
               </span>
               <span className="block text-xs text-slate-500">
-                Language for Civic Life
+                Intelligent access to your city, in any language
               </span>
             </div>
             <p className="max-w-2xl mx-auto text-sm text-slate-600 dark:text-slate-300">
-              Bridging languages to make local government accessible to everyone.
+              Making civic information clear, simple, and accessible to everyone
             </p>
 
             <nav className="mt-5 flex flex-wrap justify-center gap-3 text-sm">
-              <FooterLink href="/translate" label="Translate" />
-              <FooterDot />
               <FooterLink href="/summarize" label="Simplify" />
+              <FooterDot />
+			   <FooterLink href="/rewrite" label="Write to City" />
               <FooterDot />
               <FooterLink href="/map" label="Map" />
               <FooterDot />

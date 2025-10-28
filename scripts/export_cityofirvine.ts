@@ -8,7 +8,18 @@ const BASE = "https://cityofirvine.org";
 
 const PAGES = [
   "/services",
+  "/awards",
   "/city-clerk/passport-services",
+  "/live/new-irvine",
+  "/diversity-equity-and-inclusion",
+  "/child-care-development/child-care-scholarships",
+  "/child-care-development/financial-assistance-child-care",
+  "/child-care-development/parenting-resources",
+  "/irvine-gives/children-youth-families",
+  "/seek-assistance/financial-aid-food-pantries-rental-assistance",
+  "/seek-assistance/health-care-resources",
+  "/seek-assistance/families-247-hotlines",
+  "/child-care-development/irvine-child-care-project",
 ];
 
 function cleanText($: any) {

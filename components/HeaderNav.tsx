@@ -5,7 +5,6 @@ import { Languages } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 
 const nav = [
-  { href: '/translate', label: 'Translate' },
   { href: '/summarize', label: 'Simplify' },
  
   { href: '/rewrite', label: 'Write to City', icon: <Languages size={16} /> },

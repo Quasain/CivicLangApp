@@ -23,16 +23,10 @@ export default function Page() {
           <div className="absolute inset-0 -z-10 rounded-3xl bg-gradient-to-r from-indigo-500/10 via-sky-500/10 to-emerald-500/10 blur-2xl" />
           <h2 className="text-2xl font-semibold text-slate-900 mb-3">All-in-one civic language platform</h2>
           <p className="text-slate-600 mb-6">
-            Translate Irvine resources, simplify city documents, and communicate confidently with local agencies — all in your preferred language.
+            An intelligent civic chat that helps residents simplify city documents, navigate local services, and communicate confidently with local agencies — all in your preferred language.
           </p>
 
           <div className="flex flex-wrap gap-3">
-            <Link
-              href="/translate"
-              className="rounded-xl bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:from-indigo-500 hover:to-cyan-500 transition"
-            >
-              🌐 Translate
-            </Link>
             <Link
               href="/summarize"
               className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition"
@@ -46,6 +40,13 @@ export default function Page() {
             >
               ✍️ Write to City
             </Link>
+			<Link
+				href="/map"
+				className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/80 px-4 py-2 text-slate-800 shadow-sm hover:bg-white"
+			>
+			<span>🗺️</span>
+			<span className="font-medium">Map</span>
+			</Link>
             <Link
               href="/chat"
               className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 shadow-sm transition"
